@@ -1,42 +1,47 @@
-using System;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using System;
 
-/// <summary>
-/// Componente UI para una carta (Image en Canvas).
-/// Soporta IPointerClickHandler y notifica mediante Action cuando es clickeada.
-/// </summary>
+/*
+se va a encargar de manejar toda la parte de la UI de las cartas
+es decir, las acciones que el jugador puede hacer con las cartas al jugar
+se va a encargar de decir cuando fue clickeada y asi
+*/
 public class CartasUI : MonoBehaviour, IPointerClickHandler
 {
     [Header("UI refs")]
-    public Image cartaImage;        // arrastra la Image del prefab
-    public GameObject highlight;    // borde/efecto para selección, child enabled/disabled
-    public Text txtTipo;            // (opcional) texto donde se muestra "Infantería", etc.
+    public Image cartaImage; //la imagen de la carta
+    
+    public GameObject highlight; //efecto de borde
+    
+    public UnityEngine.UI.Text txtTipo; //texto que dice el tipo de carta
 
-    [HideInInspector] public Carta datosLogicos; // referencia a la carta lógica
-    private bool seleccionada = false;
-
-    public Action<CartasUI> OnClicked;
-
+    [HideInInspector] public Carta datosLogicos; //carga toda la logica de las cartas
+    
+    private bool seleccionada = false; //verifica si la carta fue seleccionada
+    
+    public Action<CartasUI> OnClicked; //por medio de un Action me dice si la CartaUI fue clickeada
+    
+    
     public void Configurar(Carta carta, Sprite spriteCarta)
     {
         datosLogicos = carta;
-        if (cartaImage == null) cartaImage = GetComponentInChildren<Image>();
+        if (cartaImage == null) cartaImage = GetComponentInChildren<Image>(); 
         MostrarSprite(spriteCarta);
         ActualizarTipoTexto();
         Deseleccionar();
         gameObject.SetActive(true);
     }
 
-    public void MostrarSprite(Sprite s)
+    public void MostrarSprite(Sprite s) //muestra el sprite en la UI
     {
         if (cartaImage == null) return;
         cartaImage.sprite = s;
         cartaImage.enabled = true;
     }
 
-    public void Ocultar()
+    public void Ocultar() //quita la carta de la UI 
     {
         if (cartaImage == null) return;
         cartaImage.enabled = false;
@@ -44,63 +49,46 @@ public class CartasUI : MonoBehaviour, IPointerClickHandler
         Deseleccionar();
     }
 
+    
     public void OnClickCarta()
     {
         ToggleSeleccion();
+        
         OnClicked?.Invoke(this);
     }
 
-    public void OnPointerClick(PointerEventData eventData)
-    {
-        OnClickCarta();
-    }
+    //recibe infiormacion sobre si la carta fue clickeada en caso que lo fuera activa el OnClickOn
+    public void OnPointerClick(PointerEventData eventData) => OnClickCarta();
 
+    //encargado de altenar el valor de seleccion y activar el highligth si existe y si seleccionada es verad
     public void ToggleSeleccion()
     {
         seleccionada = !seleccionada;
         if (highlight != null) highlight.SetActive(seleccionada);
     }
 
-    public void Seleccionar()
-    {
-        seleccionada = true;
-        if (highlight != null) highlight.SetActive(true);
-    }
+    //se encarga de activar el highligth
+    public void Seleccionar() { seleccionada = true; if (highlight != null) highlight.SetActive(true); }
 
-    public void Deseleccionar()
-    {
-        seleccionada = false;
-        if (highlight != null) highlight.SetActive(false);
-    }
+    //se encarga de desactivar el highligth
+    public void Deseleccionar() { seleccionada = false; if (highlight != null) highlight.SetActive(false); }
 
+    //me dice si fue seleccionada
     public bool EstaSeleccionada() => seleccionada;
 
+    //me actualiza el texto de la carta
     private void ActualizarTipoTexto()
     {
-        if (txtTipo == null) return;
-        if (datosLogicos == null)
+        if (txtTipo == null) return; //si el texto es nulo entonces no hace nada
+        
+        if (datosLogicos == null) { txtTipo.text = ""; return; } //si la carta es nula entonces no hace nada
+
+        //ve cual es el tipo de la carta y actualiza el txttipo en base al cardtype
+        switch (datosLogicos.tipo)
         {
-            txtTipo.text = "";
-            return;
+            case CardType.Infanteria: txtTipo.text = "Infantería"; break;
+            case CardType.Caballeria: txtTipo.text = "Caballería"; break;
+            default: txtTipo.text = "Artillería"; break;
         }
-
-        txtTipo.text = TipoToLabel(datosLogicos.tipo);
-    }
-
-    private string TipoToLabel(CardType t)
-    {
-        switch (t)
-        {
-            case CardType.Infanteria: return "Infantería";
-            case CardType.Caballeria: return "Caballería";
-            case CardType.Artilleria: return "Artillería";
-            default: return t.ToString();
-        }
-    }
-
-    public void ActualizarSelectionVisual(bool state)
-    {
-        seleccionada = state;
-        if (highlight != null) highlight.SetActive(state);
     }
 }
