@@ -418,4 +418,158 @@ public class BoardManager : NetworkBehaviour
         territoryById.TryGetValue(idx, out Territory t);
         return t;
     }
+
+    public void HandlePlayerEliminated(NetworkPlayer eliminatedPlayer, NetworkPlayer eliminatorPlayer = null)
+    {
+        if (!IsServer) return;
+        if (eliminatedPlayer == null) return;
+    
+        ulong eliminatedClientId = eliminatedPlayer.OwnerClientId;
+        Debug.Log($"[Server] Procesando eliminación del jugador {eliminatedClientId} (alias={eliminatedPlayer.Alias.Value})");
+    
+        // 1) Devolver cartas del jugador eliminado al mazo (opción solicitada)
+        try
+        {
+            // Creamos un MyArray<Carta> temporal para devolver las cartas
+            MyArray<Carta> lista = new MyArray<Carta>(eliminatedPlayer.Mano.mano.Capacity);
+            // Copiamos las cartas actuales (si las hay)
+            for (int i = 0; i < eliminatedPlayer.Mano.mano.Count; i++)
+            {
+                var c = eliminatedPlayer.Mano.mano[i];
+                if (c != null) lista.Add(c);
+            }
+    
+            // Limpiamos la mano del eliminado
+            eliminatedPlayer.Mano = new ManoJugador();
+    
+            if (lista.Count > 0)
+            {
+                if (this.mazo != null)
+                {
+                    this.mazo.AgregarCarta(lista); // devuelve al mazo server-side
+                    Debug.Log($"[Server] Devueltas {lista.Count} cartas del jugador {eliminatedClientId} al mazo.");
+                }
+                else
+                {
+                    Debug.LogWarning("[Server] Mazo es null: cartas no devueltas al mazo.");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Debug.LogError("[Server] Error al devolver cartas al mazo: " + ex.Message);
+        }
+    
+        // 2) Marcar jugador como eliminado
+        eliminatedPlayer.IsEliminated.Value = true;
+    
+        // Notificar al owner (para activar UI y modo espectador local)
+        var notifyParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { eliminatedClientId } } };
+        eliminatedPlayer.NotifyEliminatedClientRpc(notifyParams);
+    
+        // 3) Cancelar pendingAttacks que involucren al jugador eliminado (atacante o defensor)
+        var toCancel = new List<int>();
+        foreach (var kv in pendingAttacks)
+        {
+            var p = kv.Value;
+            if (p.attackerClientId == eliminatedClientId || p.defenderClientId == eliminatedClientId)
+                toCancel.Add(kv.Key);
+        }
+        foreach (int id in toCancel)
+        {
+            pendingAttacks.Remove(id);
+            Debug.Log($"[Server] Cancelado pending attack {id} por eliminación de jugador {eliminatedClientId}");
+            // Opcional: notificar a jugadores afectados si quieres (ClientRpc dirigido)
+        }
+    
+        // 4) Quitarlo de jugadoresConectados (NetworkList<NetworkObjectReference>) y ajustar JugadorActualIdx
+        int removedIndex = -1;
+        for (int i = 0; i < jugadoresConectados.Count; i++)
+        {
+            if (jugadoresConectados[i].TryGet(out NetworkObject no))
+            {
+                var np = no.GetComponent<NetworkPlayer>();
+                if (np != null && np.OwnerClientId == eliminatedClientId)
+                {
+                    removedIndex = i;
+                    jugadoresConectados.RemoveAt(i);
+                    break;
+                }
+            }
+        }
+    
+        // Ajustar JugadorActualIdx con cuidado
+        if (jugadoresConectados.Count == 0)
+        {
+            Debug.Log("[Server] No quedan jugadores activos tras la eliminación.");
+        }
+        else
+        {
+            if (removedIndex >= 0)
+            {
+                if (removedIndex < JugadorActualIdx.Value)
+                {
+                    JugadorActualIdx.Value = Mathf.Max(0, JugadorActualIdx.Value - 1);
+                }
+                else if (removedIndex == JugadorActualIdx.Value)
+                {
+                    // Si el eliminado era el jugador actual, hacemos que el índice apunte al siguiente jugador válido
+                    if (JugadorActualIdx.Value >= jugadoresConectados.Count)
+                        JugadorActualIdx.Value = 0;
+                    IniciarTurno();
+                }
+            }
+        }
+    
+        // 5) Reasignar territorial ownership: poner territorios del eliminado a neutral (opción segura)
+        foreach (var t in Territories)
+        {
+            if (t.TerritoryOwnerClientId.Value == eliminatedClientId)
+            {
+                t.SetOwnerServer(0, t.NeutralColor); // neutral
+                t.SetSoldiersServer(0); // opcional: dejar 0 tropas en neutral
+            }
+        }
+    
+        // 6) Notificar a todos clientes (opcional) que hay un eliminado y refrescar UI
+        // Llamamos un ClientRpc global para refrescar UI si se necesita
+        SyncAllClientsOnPlayerEliminatedClientRpc(eliminatedClientId);
+    
+        // 7) Comprobar victoria (si solo queda 1 jugador en jugadoresConectados)
+        if (jugadoresConectados.Count == 1)
+        {
+            NetworkPlayer ganador = null;
+            if (jugadoresConectados[0].TryGet(out NetworkObject no))
+                ganador = no.GetComponent<NetworkPlayer>();
+    
+            if (ganador != null)
+            {
+                Debug.Log($"[Server] ¡Victoria! Ganador: {ganador.Alias.Value.ToString()} ({ganador.OwnerClientId})");
+                var allParams = new ClientRpcParams();
+                EndGameClientRpc(ganador.OwnerClientId, allParams);
+            }
+        }
+    
+        Debug.Log($"[Server] Finalizado manejo de eliminación para {eliminatedClientId}");
+    }
+    
+    // ClientRpc para indicar a todos que refresquen UI/estado tras la eliminación
+    [ClientRpc]
+    private void SyncAllClientsOnPlayerEliminatedClientRpc(ulong eliminatedClientId)
+    {
+        // UI global puede actualizar listas, eliminar avatar, etc.
+        Debug.Log($"[Client] SyncAllClientsOnPlayerEliminatedClientRpc -> eliminado: {eliminatedClientId}");
+        UIManager.Instance?.RefrescarUI();
+    }
+    
+    // End game notification a todos
+    [ClientRpc]
+    private void EndGameClientRpc(ulong winnerClientId, ClientRpcParams clientRpcParams = default)
+    {
+        var winner = GetJugadorPorClientId(winnerClientId);
+        string winnerName = winner != null ? winner.Alias.Value.ToString() : winnerClientId.ToString();
+        UIManager.Instance?.ShowEndGame(winnerClientId, winnerName);
+    }
+
 }
+
