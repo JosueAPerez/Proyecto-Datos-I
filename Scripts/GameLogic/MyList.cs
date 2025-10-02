@@ -93,6 +93,7 @@ public class MyArray<T> : IEnumerable<T>
         items[idx_ocupado] = default;
         idx_ocupado--;
     }
+    // a partir de aqui es la logica para poder hacer foreach
     public IEnumerator<T> GetEnumerator()
     {
         for (int i = 0; i <= idx_ocupado; i++)
@@ -104,3 +105,4 @@ public class MyArray<T> : IEnumerable<T>
         return GetEnumerator();
     }
 }
+
