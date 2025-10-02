@@ -3,20 +3,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 
-/// <summary>
-/// SpectatorManager: gestiona el cambio local a modo espectador cuando el jugador es eliminado.
-/// - Singleton (por cliente).
-/// - Al entrar en modo espectador:
-///    1) Desactiva componentes "control" del NetworkPlayer local (intenta no tocar NetworkPlayer).
-///    2) Instancia una cámara "espectador" con control libre (FreeSpectatorCamera).
-///    3) Muestra UI de espectador si está asignada.
-/// - Guarda la lista de componentes desactivados para poder restaurar si sales de espectador.
-/// 
-/// Instrucciones:
-///  - Asigna 'spectatorCameraPrefab' a un prefab que contenga Camera + FreeSpectatorCamera.
-///  - Asigna 'spectatorUIPanel' a un GameObject de UI que quieras mostrar en modo espectador.
-///  - El manager actúa localmente (Client-side). El servidor decide quién es espectador y notifica al client owner.
-/// </summary>
 public class SpectatorManager : MonoBehaviour
 {
     public static SpectatorManager Instance;
@@ -35,10 +21,6 @@ public class SpectatorManager : MonoBehaviour
         else Destroy(gameObject);
     }
 
-    /// <summary>
-    /// Llamar desde NotifyEliminatedClientRpc cuando el cliente local ha sido eliminado.
-    /// Ejecuta los pasos para hacer al jugador espectador localmente.
-    /// </summary>
     public void EnterSpectatorModeLocal()
     {
         if (isSpectating) return;
