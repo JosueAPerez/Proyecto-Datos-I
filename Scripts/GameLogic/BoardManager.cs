@@ -4,52 +4,84 @@ using UnityEngine;
 using Unity.Netcode;
 using UnityEngine.SceneManagement;
 
+//se encarga de todo el control del tablero es quien establece la verdad absoluta del server
 public class BoardManager : NetworkBehaviour
 {
-    public static BoardManager Instance;
-    public Territory[] Territories;
+    public static BoardManager Instance; //crea ;a instancia del boardmanager
+    public Territory[] Territories; //array de los territorios
 
-    public enum TurnPhase { Refuerzo, Ataque, Reagrupacion }
+    public enum TurnPhase { Refuerzo, Ataque, Reagrupacion } //establecemos las fases del juego
+    
+    //crea una networkvariable de la fase actual lo que hace es manejar en fase nos encontramos
     public NetworkVariable<TurnPhase> FaseActual = new NetworkVariable<TurnPhase>(TurnPhase.Refuerzo);
 
+    //necesitamos un diccionario el cual nos establezca la relacion entre un territorio y su id
     public Dictionary<int, Territory> territoryById = new Dictionary<int, Territory>();
-    public NetworkList<NetworkObjectReference> jugadoresConectados;
 
+    /*
+    establezco la lista de los jugadores en el juego, esto por medio de una lista
+    para entonces llevar un control de indices en el cual me permita conocer cual es
+    el jugador actual
+    */
+    public NetworkList<NetworkObjectReference> jugadoresConectados;
     public NetworkVariable<int> JugadorActualIdx = new NetworkVariable<int>(0);
 
+    /*
+    establezco el mazo de cartas global que se va a utilizar en toda la partida
+    y tambien establezco el contador de los canjeos, para saber la cantidad tropas
+    a dar por cada canjeo
+    */
     public Mazo mazo;
     public int contadorGlobalIntercambios = 0;
 
-    // Pending attacks
+    /*
+    esstructura que me dice los datos de un ataque pendiente
+    es decir, el aatacante inicia el ataque y se queda esperando
+    por la respuesta del defensor
+    */
     private struct AttackPending
     {
-        public int attackId;
-        public int atacanteIdx;
-        public int defensorIdx;
-        public int tropasAtacantesRequested;
-        public ulong attackerClientId;
-        public ulong defenderClientId;
-        public double timeCreated;
+        public int attackId; //Id del ataque pendiente
+        
+        public int atacanteIdx; //el indice del territorio atacante
+        
+        public int defensorIdx; //indice del territorio defensor
+        
+        public int tropasAtacantesRequested; //pide la cantidad de tropas que van a atacar
+        
+        public ulong attackerClientId; //OwnerClientId del atacante
+        
+        public ulong defenderClientId; //OwnerClientId del defensor
+        
+        public double timeCreated; //un timer para ver que pasa en timeouts
     }
-
-    private int nextAttackId = 1;
+    
+    private int nextAttackId = 1; //id del siguiente ataque
+    
+    //crea un diccionario para el manejo de los ataques pendientes
     private Dictionary<int, AttackPending> pendingAttacks = new Dictionary<int, AttackPending>();
-    private float defenderResponseTimeout = 10f;
+    
+    private float defenderResponseTimeout = 10f; //tiempo limite de respuesta
 
     private void Awake()
     {
-        if (Instance == null) Instance = this;
+        if (Instance == null) Instance = this; //me crea la instancia del boardmanager
         else { Destroy(gameObject); return; }
-
+        
         jugadoresConectados = new NetworkList<NetworkObjectReference>();
 
+        /*
+        crea toda la lista de los tipo territorio y los sortea en base al indice
+        ademas despues de eso recorre la lista y los agrega dentro del territorybyid de manera
+        que el indice del territorio sea el key
+        */
         Territories = FindObjectsByType<Territory>(FindObjectsSortMode.None);
         Array.Sort(Territories, (a, b) => a.Idx.CompareTo(b.Idx));
 
         foreach (var t in Territories)
             if (!territoryById.ContainsKey(t.Idx)) territoryById[t.Idx] = t;
 
-        LoadAdjacency();
+        LoadAdjacency(); //extra los territorios adyacentes del Json
 
         if (IsServer) InitializeMazoServer();
 
@@ -572,4 +604,5 @@ public class BoardManager : NetworkBehaviour
     }
 
 }
+
 
