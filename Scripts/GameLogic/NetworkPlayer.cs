@@ -7,6 +7,7 @@ public class NetworkPlayer : NetworkBehaviour
     public NetworkVariable<FixedString32Bytes> Alias = new NetworkVariable<FixedString32Bytes>();
     public NetworkVariable<Color32> ColorJugador = new NetworkVariable<Color32>();
     public NetworkVariable<int> TropasDisponibles = new NetworkVariable<int>(0);
+    public NetworkVariable<bool> IsEliminated = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public MyArray<Territory> Territorios { get; private set; } = new MyArray<Territory>(42);
     public ManoJugador Mano = new ManoJugador();
@@ -229,3 +230,4 @@ public class NetworkPlayer : NetworkBehaviour
         }
     }
 }
+
