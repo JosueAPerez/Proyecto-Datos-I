@@ -229,5 +229,30 @@ public class NetworkPlayer : NetworkBehaviour
             else Debug.LogWarning("SendHandClientRpc: no se encontró ManoJugadorUI en cliente.");
         }
     }
+    
+    [ClientRpc]
+    public void NotifyEliminatedClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        Debug.Log("[Client] NotifyEliminatedClientRpc recibido.");
+    
+        // Si soy el propietario (fui eliminado)
+        if (IsOwner)
+        {
+            // Mostrar UI local (si tienes UIManager con ShowEliminated)
+            UIManager.Instance?.ShowEliminatedScreen();
+    
+            // Activar modo espectador local (si existe)
+            if (SpectatorManager.Instance != null)
+            {
+                SpectatorManager.Instance.EnterSpectatorModeLocal();
+            }
+        }
+        else
+        {
+            // Para otros clientes: solo actualizar estado de jugador visualmente
+            UIManager.Instance?.RefrescarUI();
+        }
+    }
 }
+
 
