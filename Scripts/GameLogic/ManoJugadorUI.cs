@@ -5,7 +5,7 @@ using System.Collections.Generic;
 
 public class ManoJugadorUI : MonoBehaviour
 {
-    [Header("Prefabs & UI (asignar en prefab)")]
+    [Header("Prefabs & UI (asignar)")]
     public GameObject cartaUIPrefab;
     public Transform contenedorCartas;
     public Transform contenedorPopup;
@@ -18,34 +18,16 @@ public class ManoJugadorUI : MonoBehaviour
     private MyArray<CartasUI> cartasVisuales;
     private bool manoAbierta = false;
     private NetworkPlayer ownerPlayer;
-
     private int maxSeleccion = 3;
     private int selectedCount = 0;
 
     public void Initialize(NetworkPlayer owner)
     {
         ownerPlayer = owner;
-
-        int capacidad = 6;
-        try { capacidad = manoLogica.mano.Capacity; } catch { capacidad = 6; }
-        cartasVisuales = new MyArray<CartasUI>(capacidad);
-
-        if (btnAbrirMano != null)
-        {
-            btnAbrirMano.onClick.RemoveAllListeners();
-            btnAbrirMano.onClick.AddListener(ToggleMano);
-        }
-        if (btnCanjear != null)
-        {
-            btnCanjear.onClick.RemoveAllListeners();
-            btnCanjear.onClick.AddListener(OnClickCanjear);
-        }
-        if (btnCerrarMano != null)
-        {
-            btnCerrarMano.onClick.RemoveAllListeners();
-            btnCerrarMano.onClick.AddListener(CerrarMano);
-        }
-
+        cartasVisuales = new MyArray<CartasUI>(6);
+        if (btnAbrirMano != null) { btnAbrirMano.onClick.RemoveAllListeners(); btnAbrirMano.onClick.AddListener(ToggleMano); }
+        if (btnCanjear != null) { btnCanjear.onClick.RemoveAllListeners(); btnCanjear.onClick.AddListener(OnClickCanjear); }
+        if (btnCerrarMano != null) { btnCerrarMano.onClick.RemoveAllListeners(); btnCerrarMano.onClick.AddListener(CerrarMano); }
         gameObject.SetActive(false);
     }
 
@@ -65,23 +47,15 @@ public class ManoJugadorUI : MonoBehaviour
         if (manoAbierta) RefrescarUI();
     }
 
-    public void CerrarMano()
-    {
-        manoAbierta = false;
-        gameObject.SetActive(false);
-    }
+    public void CerrarMano() { manoAbierta = false; gameObject.SetActive(false); }
 
     public void MostrarCartaObtenidaVisual(int territoryIdx, CardType tipo)
     {
         Territory terr = null;
         if (BoardManager.Instance != null)
         {
-            foreach (var t in BoardManager.Instance.Territories)
-            {
-                if (t != null && t.Idx == territoryIdx) { terr = t; break; }
-            }
+            foreach (var t in BoardManager.Instance.Territories) if (t != null && t.Idx == territoryIdx) { terr = t; break; }
         }
-
         Carta nueva = new Carta(tipo, terr);
         manoLogica.AgregarCartaMano(nueva);
 
@@ -90,10 +64,7 @@ public class ManoJugadorUI : MonoBehaviour
         CartasUI cui = go.GetComponent<CartasUI>();
         Sprite s = SpriteManager.GetSpriteForCarta(nueva);
         cui.Configurar(nueva, s);
-
-        // registrar evento
         cui.OnClicked += OnCartaClicked;
-
         StartCoroutine(EliminarPopupDespues(go, 3f));
         MostrarMensaje($"Has recibido una carta: {tipo}");
     }
@@ -107,16 +78,10 @@ public class ManoJugadorUI : MonoBehaviour
 
     public void RefrescarUI()
     {
-        // destruir visuales anteriores
         if (cartasVisuales != null)
-        {
             foreach (var c in cartasVisuales) if (c != null) Destroy(c.gameObject);
-        }
 
-        int capacidad = 6;
-        try { capacidad = manoLogica.mano.Capacity; } catch { capacidad = 6; }
-        cartasVisuales = new MyArray<CartasUI>(capacidad);
-
+        cartasVisuales = new MyArray<CartasUI>(6);
         selectedCount = 0;
 
         for (int i = 0; i < manoLogica.mano.Count; i++)
@@ -134,15 +99,7 @@ public class ManoJugadorUI : MonoBehaviour
     private void OnCartaClicked(CartasUI clicked)
     {
         if (clicked == null) return;
-
-        // Si se va a seleccionar y ya hay 3, rechazamos
-        if (!clicked.EstaSeleccionada() && selectedCount >= maxSeleccion)
-        {
-            MostrarMensaje($"Solo puedes seleccionar {maxSeleccion} cartas.");
-            return;
-        }
-
-        // Toggle y ajustar contador
+        if (!clicked.EstaSeleccionada() && selectedCount >= maxSeleccion) { MostrarMensaje($"Solo puedes seleccionar {maxSeleccion} cartas."); return; }
         clicked.ToggleSeleccion();
         selectedCount = 0;
         for (int i = 0; i < cartasVisuales.Count; i++)
@@ -154,8 +111,7 @@ public class ManoJugadorUI : MonoBehaviour
 
     public void MostrarMensaje(string texto)
     {
-        if (txtMensaje != null) txtMensaje.text = texto;
-        else Debug.Log(texto);
+        if (txtMensaje != null) txtMensaje.text = texto; else Debug.Log(texto);
     }
 
     private void OnClickCanjear()
@@ -166,12 +122,7 @@ public class ManoJugadorUI : MonoBehaviour
             var cu = cartasVisuales[i];
             if (cu != null && cu.EstaSeleccionada()) seleccionLogica.Add(cu.datosLogicos);
         }
-
-        if (seleccionLogica.Count != 3)
-        {
-            MostrarMensaje("Selecciona exactamente 3 cartas para canjear.");
-            return;
-        }
+        if (seleccionLogica.Count != 3) { MostrarMensaje("Selecciona exactamente 3 cartas para canjear."); return; }
 
         CardSelection sel = new CardSelection();
         sel.idx0 = (seleccionLogica[0].territorio != null) ? seleccionLogica[0].territorio.Idx : -1;
@@ -186,52 +137,37 @@ public class ManoJugadorUI : MonoBehaviour
             ownerPlayer.RequestCanjearServerRpc(sel);
             MostrarMensaje("Solicitud de canje enviada al servidor...");
         }
-        else
-        {
-            MostrarMensaje("Player network no disponible para solicitar canje.");
-        }
+        else MostrarMensaje("Player network no disponible para solicitar canje.");
     }
 
-    // El servidor envía RemovedCardsInfo; el cliente borra localmente
+    // Recibir un snapshot de mano desde server (si implementas RequestHand)
+    public void RecibirManoDesdeServer(CardData[] hand)
+    {
+        manoLogica = new ManoJugador();
+        if (hand == null) return;
+        for (int i = 0; i < hand.Length; i++)
+        {
+            Territory terr = null;
+            if (BoardManager.Instance != null) terr = BoardManager.Instance.GetTerritoryByIdx(hand[i].territoryIdx);
+            Carta c = new Carta((CardType)hand[i].tipo, terr);
+            manoLogica.AgregarCartaMano(c);
+        }
+        RefrescarUI();
+    }
+
+    // Manejar resultado del canje (server notifica)
     public void HandleCanjeResult(bool exito, int tropas, RemovedCardsInfo removed)
     {
-        if (!exito)
-        {
-            MostrarMensaje("Canje inválido.");
-            return;
-        }
-
-        if (removed.count <= 0)
-        {
-            MostrarMensaje($"Canje válido: +{tropas} tropas (sin info de cartas).");
-            RefrescarUI();
-            return;
-        }
+        if (!exito) { MostrarMensaje("Canje inválido."); return; }
+        if (removed.count <= 0) { MostrarMensaje($"Canje válido: +{tropas} tropas (sin info de cartas)."); RefrescarUI(); return; }
 
         for (int k = 0; k < removed.count; k++)
         {
             int ridx = removed.GetIdxAt(k);
             CardType rtipo = removed.GetTipoAt(k);
-
             Carta encontrada = null;
-            foreach (var c in manoLogica.mano)
-            {
-                int cIdx = (c.territorio != null) ? c.territorio.Idx : -1;
-                if (cIdx == ridx && c.tipo == rtipo)
-                {
-                    encontrada = c;
-                    break;
-                }
-            }
-
-            if (encontrada != null)
-            {
-                manoLogica.mano.Remove(encontrada);
-            }
-            else
-            {
-                Debug.LogWarning($"HandleCanjeResult: no se encontró localmente la carta (idx={ridx}, tipo={rtipo}).");
-            }
+            foreach (var c in manoLogica.mano) if (c != null && ((c.territorio != null ? c.territorio.Idx : -1) == ridx) && c.tipo == rtipo) { encontrada = c; break; }
+            if (encontrada != null) manoLogica.mano.Remove(encontrada);
 
             CartasUI visualARemover = null;
             for (int i = 0; i < cartasVisuales.Count; i++)
@@ -240,23 +176,10 @@ public class ManoJugadorUI : MonoBehaviour
                 if (cu != null && cu.datosLogicos != null)
                 {
                     int cIdx = (cu.datosLogicos.territorio != null) ? cu.datosLogicos.territorio.Idx : -1;
-                    if (cIdx == ridx && cu.datosLogicos.tipo == rtipo)
-                    {
-                        visualARemover = cu;
-                        break;
-                    }
+                    if (cIdx == ridx && cu.datosLogicos.tipo == rtipo) { visualARemover = cu; break; }
                 }
             }
-
-            if (visualARemover != null)
-            {
-                cartasVisuales.Remove(visualARemover);
-                if (visualARemover.gameObject != null) Destroy(visualARemover.gameObject);
-            }
-            else
-            {
-                Debug.Log($"HandleCanjeResult: no se encontró visual para (idx={ridx}, tipo={rtipo}).");
-            }
+            if (visualARemover != null) { cartasVisuales.Remove(visualARemover); if (visualARemover.gameObject != null) Destroy(visualARemover.gameObject); }
         }
 
         MostrarMensaje($"Canje válido: +{tropas} tropas obtenidas.");
