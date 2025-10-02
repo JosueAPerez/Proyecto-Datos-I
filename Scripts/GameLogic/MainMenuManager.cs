@@ -25,40 +25,44 @@ public class MainMenuManager : MonoBehaviour
         botonServer.onClick.AddListener(OnServerClick);
     }
 
+    void GuardarNombre()
+    {
+        string nombre = inputNombre != null ? inputNombre.text.Trim() : "";
+        if (!string.IsNullOrEmpty(nombre)) GameSettings.NombreJugador = nombre;
+    }
+
+    void ConfigurarTransporte(string ip)
+    {
+        if (NetworkManager.Singleton == null) { Debug.LogError("NetworkManager.Singleton es null"); return; }
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport != null)
+        {
+            transport.ConnectionData.Address = ip;
+            transport.ConnectionData.Port = port;
+        }
+        else Debug.LogWarning("UnityTransport no encontrado en NetworkManager.Singleton");
+    }
+
     void OnHostClick()
     {
         GuardarNombre();
-        ConfigurarTransporte("0.0.0.0"); // escucha en todas las interfaces
+        ConfigurarTransporte("0.0.0.0");
+        DontDestroyOnLoad(NetworkManager.Singleton.gameObject);
         if (NetworkManager.Singleton.StartHost())
         {
-            Debug.Log("✅ Host iniciado");
+            Debug.Log("Host iniciado");
             NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
         }
-        else
-        {
-            Debug.LogError("❌ No se pudo iniciar Host");
-        }
+        else Debug.LogError("No se pudo iniciar Host");
     }
 
     void OnClientClick()
     {
         GuardarNombre();
-        if (string.IsNullOrEmpty(inputIP.text))
-        {
-            Debug.LogWarning("⚠️ Ingresa la IP del servidor.");
-            return;
-        }
-
+        if (string.IsNullOrEmpty(inputIP.text)) { Debug.LogWarning("Ingresa la IP del servidor."); return; }
         ConfigurarTransporte(inputIP.text);
-        if (NetworkManager.Singleton.StartClient())
-        {
-            Debug.Log("✅ Cliente iniciado");
-            // Los clientes no cargan escenas manualmente, Netcode lo hace
-        }
-        else
-        {
-            Debug.LogError("❌ No se pudo iniciar Cliente");
-        }
+        if (NetworkManager.Singleton.StartClient()) Debug.Log("Cliente iniciado");
+        else Debug.LogError("No se pudo iniciar Cliente");
     }
 
     void OnServerClick()
@@ -67,29 +71,9 @@ public class MainMenuManager : MonoBehaviour
         ConfigurarTransporte("0.0.0.0");
         if (NetworkManager.Singleton.StartServer())
         {
-            Debug.Log("✅ Servidor iniciado");
+            Debug.Log("Servidor iniciado");
             NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
         }
-        else
-        {
-            Debug.LogError("❌ No se pudo iniciar Servidor");
-        }
-    }
-
-    void GuardarNombre()
-    {
-        string nombre = inputNombre.text.Trim();
-        if (!string.IsNullOrEmpty(nombre))
-            GameSettings.NombreJugador = nombre;
-    }
-
-    void ConfigurarTransporte(string ip)
-    {
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        if (transport != null)
-        {
-            transport.ConnectionData.Address = ip;
-            transport.ConnectionData.Port = port;
-        }
+        else Debug.LogError("No se pudo iniciar Servidor");
     }
 }
