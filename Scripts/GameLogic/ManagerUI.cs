@@ -26,13 +26,6 @@ public class UIManager : MonoBehaviour
     public Color colorAtaque = Color.red;
     public Color colorReagrupacion = Color.blue;
 
-    [Header("Inventario de Cartas")]
-    public GameObject inventarioPanel;
-    public GameObject cartaPrefab;
-    public Transform contenedorCartas;
-    public Button inventarioToggleButton;
-    public Button confirmarIntercambioButton;
-
     [Header("Defense Prompt UI")]
     public GameObject defensePromptPanel;
     public Slider defensaSlider;
