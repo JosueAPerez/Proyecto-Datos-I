@@ -164,7 +164,7 @@ public class ManoJugadorUI : MonoBehaviour
         for (int k = 0; k < removed.count; k++)
         {
             int ridx = removed.GetIdxAt(k);
-            CardType rtipo = removed.GetTipoAt(k);
+            CardType rtipo = (CardType)removed.GetTipoAt(k);
             Carta encontrada = null;
             foreach (var c in manoLogica.mano) if (c != null && ((c.territorio != null ? c.territorio.Idx : -1) == ridx) && c.tipo == rtipo) { encontrada = c; break; }
             if (encontrada != null) manoLogica.mano.Remove(encontrada);
@@ -186,4 +186,5 @@ public class ManoJugadorUI : MonoBehaviour
         RefrescarUI();
     }
 }
+
 
