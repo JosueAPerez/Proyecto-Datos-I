@@ -9,6 +9,7 @@ public class NetworkPlayer : NetworkBehaviour
     public NetworkVariable<Color32> ColorJugador = new NetworkVariable<Color32>();
     public NetworkVariable<int> TropasDisponibles = new NetworkVariable<int>(0);
     public NetworkVariable<bool> IsEliminated = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<bool> MustExchangeCards = new NetworkVariable<bool>(false, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     public MyArray<Territory> Territorios { get; private set; } = new MyArray<Territory>(42);
     public ManoJugador Mano = new ManoJugador();
@@ -79,6 +80,118 @@ public class NetworkPlayer : NetworkBehaviour
         }
     }
 
+    [ClientRpc]
+    public void ForceExchangeClientRpc(int timeoutSeconds, ClientRpcParams clientRpcParams = default)
+    {
+        // Este ClientRpc llega al owner (porque será invocado con TargetClientIds = new ulong[] { OwnerClientId })
+        // Cliente debe abrir UI de canje obligatoria.
+        if (IsOwner)
+        {
+            if (localManoUI != null)
+            {
+                // Pedimos a la UI local que entre en modo forzado
+                localManoUI.StartForcedExchangeMode(timeoutSeconds);
+            }
+            else
+            {
+                var manoUI = FindFirstObjectByType<ManoJugadorUI>();
+                if (manoUI != null) manoUI.StartForcedExchangeMode(timeoutSeconds);
+                else Debug.LogWarning("ForceExchangeClientRpc: no se encontró ManoJugadorUI en owner.");
+            }
+        }
+    }
+
+    // Este método se invoca en server para forzar canje automático si el jugador
+    // no responde en el tiempo establecido. Lo dejamos público para que BoardManager lo pueda llamar.
+    public void AutoForceCanjearServer()
+    {
+        if (!IsServer) return;
+
+        // Si el jugador ya no tiene mano suficiente o ya canjeó, salir
+        if (Mano.mano.Count < 3) return;
+        if (!MustExchangeCards.Value) return; // si flag limpiado, no hacemos nada
+
+        Debug.Log($"[Server] AutoForceCanjearServer: intentando forzar canje para {OwnerClientId}");
+
+        // Buscar triple válida
+        MyArray<Carta> seleccion = TryFindValidTriple(Mano);
+
+        // Si no hay combinación válida, tomar primeras 3 como fallback
+        if (seleccion == null)
+        {
+            seleccion = new MyArray<Carta>(3);
+            for (int i = 0; i < 3 && i < Mano.mano.Count; i++) seleccion.Add(Mano.mano[i]);
+        }
+
+        // Ejecutar canje usando Mano.Canjear (ya hace la lógica y lanza excepción si algo falla)
+        int n_change_local = Mazo.CartasIntercambiadas;
+        ulong tropas = 0;
+        try
+        {
+            tropas = Mano.Canjear(seleccion, ref n_change_local);
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError("AutoForceCanjearServer: error al canjear: " + ex.Message);
+            return;
+        }
+
+        // Devolver cartas al mazo global si existe
+        if (BoardManager.Instance != null && BoardManager.Instance.mazo != null)
+        {
+            BoardManager.Instance.mazo.AgregarCarta(seleccion);
+        }
+
+        // Actualizar contador global y tropas del jugador
+        Mazo.CartasIntercambiadas = n_change_local;
+        TropasDisponibles.Value += (int)tropas;
+
+        // Preparar RemovedCardsInfo para notificar al cliente
+        RemovedCardsInfo removed = new RemovedCardsInfo();
+        removed.count = seleccion.Count;
+        removed.idx0 = removed.idx1 = removed.idx2 = -1;
+        removed.tipo0 = removed.tipo1 = removed.tipo2 = 0;
+        for (int i = 0; i < seleccion.Count; i++)
+        {
+            if (i == 0) { removed.idx0 = seleccion[i].territorio != null ? seleccion[i].territorio.Idx : -1; removed.tipo0 = (int)seleccion[i].tipo; }
+            if (i == 1) { removed.idx1 = seleccion[i].territorio != null ? seleccion[i].territorio.Idx : -1; removed.tipo1 = (int)seleccion[i].tipo; }
+            if (i == 2) { removed.idx2 = seleccion[i].territorio != null ? seleccion[i].territorio.Idx : -1; removed.tipo2 = (int)seleccion[i].tipo; }
+        }
+
+        // Notificar al propietario del resultado (solo al owner)
+        var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
+        NotifyCanjeResultClientRpc(true, (int)tropas, removed, clientRpcParams);
+
+        // Limpiar flag
+        MustExchangeCards.Value = false;
+    }
+
+    // Helper: intenta encontrar triple válido (3 iguales o 3 distintos) en la mano; retorna MyArray<Carta> o null
+    private MyArray<Carta> TryFindValidTriple(ManoJugador mano)
+    {
+        if (mano == null) return null;
+        int n = mano.mano.Count;
+        for (int i = 0; i < n - 2; i++)
+        {
+            for (int j = i + 1; j < n - 1; j++)
+            {
+                for (int k = j + 1; k < n; k++)
+                {
+                    var c0 = mano.mano[i];
+                    var c1 = mano.mano[j];
+                    var c2 = mano.mano[k];
+                    var candidate = new MyArray<Carta>(3);
+                    candidate.Add(c0);
+                    candidate.Add(c1);
+                    candidate.Add(c2);
+                    if (mano.VerificarSeleccion(candidate))
+                        return candidate;
+                }
+            }
+        }
+        return null;
+    }
+    
     // Request to server to canjear (owner -> server)
     [ServerRpc(RequireOwnership = true)]
     public void RequestCanjearServerRpc(CardSelection selection, ServerRpcParams rpcParams = default)
@@ -140,11 +253,13 @@ public class NetworkPlayer : NetworkBehaviour
         Mazo.CartasIntercambiadas = n_change_local;
         int tropasInt = (int)tropas;
         TropasDisponibles.Value += tropasInt;
-
+        MustExchangeCards.Value = false;
+        
         RemovedCardsInfo removed = new RemovedCardsInfo();
         removed.count = selec.Count;
         removed.idx0 = removed.idx1 = removed.idx2 = -1;
         removed.tipo0 = removed.tipo1 = removed.tipo2 = 0;
+        
         for (int i = 0; i < selec.Count; i++)
         {
             if (i == 0) { removed.idx0 = selec[i].territorio != null ? selec[i].territorio.Idx : -1; removed.tipo0 = (int)selec[i].tipo; }
@@ -310,6 +425,7 @@ public class NetworkPlayer : NetworkBehaviour
         TropasDisponibles.Value -= cantidad;
     }
 }
+
 
 
 
