@@ -151,8 +151,14 @@ public class UIManager : MonoBehaviour
     {
         var jugador = BoardManager.Instance.GetJugadorLocal();
         if (jugador == null || selectedTerritorio == null) return;
+        
         int cantidad = tropasSlider != null ? (int)tropasSlider.value : 1;
-
+        
+        if (jugador.MustExchangeCards != null && jugador.MustExchangeCards.Value)
+        {
+        MostrarMensajeUsuario("Debes canjear cartas antes de colocar refuerzos.");
+        return;
+        }
         // Llamar al servidor a través de NetworkPlayer
         jugador.ColocarTropasRequest(selectedTerritorio.Idx, cantidad);
     }
