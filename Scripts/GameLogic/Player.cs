@@ -1,5 +1,3 @@
-// NetworkPlayer.cs
-// Lógica por jugador (NetworkBehaviour): alias, color, tropas, mano, territorios, RPCs para canje y peticiones.
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
@@ -286,4 +284,5 @@ public class NetworkPlayer : NetworkBehaviour
         TropasDisponibles.Value -= cantidad;
     }
 }
+
 
