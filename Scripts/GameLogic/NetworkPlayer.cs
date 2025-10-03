@@ -1,6 +1,9 @@
+// NetworkPlayer.cs
+// Lógica por jugador (NetworkBehaviour): alias, color, tropas, mano, territorios, RPCs para canje y peticiones.
 using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
+using Unity.Collections;
 
 public class NetworkPlayer : NetworkBehaviour
 {
@@ -23,7 +26,7 @@ public class NetworkPlayer : NetworkBehaviour
 
         if (IsOwner)
         {
-            RequestSetAliasAndColorServerRpc(GameSettings.NombreJugador, Random.ColorHSV());
+            RequestSetAliasAndColorServerRpc(GameSettings.NombreJugador, (Color32)Random.ColorHSV());
         }
 
         Alias.OnValueChanged += (_, __) => Debug.Log($"Alias actualizado: {Alias.Value.ToString()} (ClientId={OwnerClientId})");
@@ -35,7 +38,6 @@ public class NetworkPlayer : NetworkBehaviour
             if (localManoUI != null) localManoUI.Initialize(this);
         }
 
-        // Intentar registrar en board (a veces BoardManager aún no creado)
         if (BoardManager.Instance != null)
             BoardManager.Instance.RegistrarJugador(this);
         else
@@ -49,21 +51,20 @@ public class NetworkPlayer : NetworkBehaviour
     }
 
     [ServerRpc(RequireOwnership = true)]
-    public void RequestSetAliasAndColorServerRpc(string alias, Color color, ServerRpcParams rpcParams = default)
+    public void RequestSetAliasAndColorServerRpc(string alias, Color32 color, ServerRpcParams rpcParams = default)
     {
         Alias.Value = alias;
-        ColorJugador.Value = (Color32)color;
+        ColorJugador.Value = color;
         Debug.Log($"(Server) Alias y color seteados para OwnerClientId={OwnerClientId}");
         BoardManager.Instance?.RegistrarJugador(this);
     }
 
-    // Server: agregar carta a mano lógica de este jugador y notificar al owner
+    // Añadir carta a la mano server-side y notificar owner
     public void AgregarCartaManoLogica_Server(Carta carta)
     {
         if (!IsServer) return;
         if (carta == null) return;
         Mano.AgregarCartaMano(carta);
-
         var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
         ShowObtainedCardClientRpc((carta.territorio != null) ? carta.territorio.Idx : -1, (int)carta.tipo, clientRpcParams);
     }
@@ -74,13 +75,13 @@ public class NetworkPlayer : NetworkBehaviour
         if (IsOwner && localManoUI != null) localManoUI.MostrarCartaObtenidaVisual(territoryIdx, (CardType)tipoCode);
         else
         {
-            var manoUI = FindFirstObjectByType<ManoJugadorUI>();
+            var manoUI = FindObjectOfType<ManoJugadorUI>();
             if (manoUI != null) manoUI.MostrarCartaObtenidaVisual(territoryIdx, (CardType)tipoCode);
             else Debug.LogWarning("ShowObtainedCardClientRpc: no se encontró ManoJugadorUI local.");
         }
     }
 
-    // Request from owner -> server to canjear
+    // Request to server to canjear (owner -> server)
     [ServerRpc(RequireOwnership = true)]
     public void RequestCanjearServerRpc(CardSelection selection, ServerRpcParams rpcParams = default)
     {
@@ -91,15 +92,16 @@ public class NetworkPlayer : NetworkBehaviour
         int[] wantedIdxs = new int[] { selection.idx0, selection.idx1, selection.idx2 };
         int[] wantedTipos = new int[] { selection.tipo0, selection.tipo1, selection.tipo2 };
 
+        // Buscar cartas en la mano del jugador servidor
         for (int req = 0; req < 3; req++)
         {
             int wantedIdx = wantedIdxs[req];
             CardType wantedTipo = (CardType)wantedTipos[req];
             bool found = false;
-            for (int j = 0; j < Mano.mano.Count; j++)
+            for (int j = 0; j < Mano.hand.Count; j++)
             {
                 if (usedIndices.Contains(j)) continue;
-                Carta c = Mano.mano[j];
+                Carta c = Mano.hand[j];
                 int cIdx = (c.territorio != null) ? c.territorio.Idx : -1;
                 if (cIdx == wantedIdx && c.tipo == wantedTipo)
                 {
@@ -135,7 +137,7 @@ public class NetworkPlayer : NetworkBehaviour
             return;
         }
 
-        if (BoardManager.Instance != null && BoardManager.Instance.mazo != null) BoardManager.Instance.mazo.AgregarCarta(selec);
+        if (BoardManager.Instance != null && BoardManager.Instance.deck != null) BoardManager.Instance.deck.AgregarCarta(selec);
 
         Mazo.CartasIntercambiadas = n_change_local;
         int tropasInt = (int)tropas;
@@ -163,7 +165,7 @@ public class NetworkPlayer : NetworkBehaviour
         if (IsOwner && localManoUI != null) localManoUI.HandleCanjeResult(exito, tropas, removed);
         else
         {
-            var manoUI = FindFirstObjectByType<ManoJugadorUI>();
+            var manoUI = FindObjectOfType<ManoJugadorUI>();
             if (manoUI != null) manoUI.HandleCanjeResult(exito, tropas, removed);
             else Debug.LogWarning("NotifyCanjeResultClientRpc: no se encontró ManoJugadorUI en cliente.");
         }
@@ -178,14 +180,13 @@ public class NetworkPlayer : NetworkBehaviour
         Debug.Log($"(Server) {Alias.Value.ToString()} recibe {tropasBase} tropas.");
     }
 
-    // Recompensa por conquista: crear carta ligada al territorio y notificar al owner
+    // Recompensa por conquista
     public void RecompensaConquista(Territory terr)
     {
         if (!IsServer) return;
-        if (Mano.mano.Count >= 7) { Debug.Log($"⚠️ {Alias.Value.ToString()} tiene 7 cartas."); return; }
+        if (Mano.hand.Count >= 7) { Debug.Log($"⚠️ {Alias.Value.ToString()} tiene 7 cartas."); return; }
         var nueva = Carta.CrearAleatoriaDesdeTerritorio(terr);
         Mano.AgregarCartaMano(nueva);
-        // Notificar owner
         var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
         ShowObtainedCardClientRpc((nueva.territorio != null) ? nueva.territorio.Idx : -1, (int)nueva.tipo, clientRpcParams);
     }
@@ -194,25 +195,25 @@ public class NetworkPlayer : NetworkBehaviour
 
     public void AgregarTerritorio(Territory terr)
     {
-        if (!Territorios.Contains(terr)) { Territorios.Add(terr); terr.UpdateColor(); }
+        if (!Territorios.Contains(terr)) { Territorios.Add(terr); if (terr != null) terr.UpdateColor(); }
     }
 
     public void EliminarTerritorio(Territory terr)
     {
-        if (Territorios.Contains(terr)) { Territorios.Remove(terr); terr.UpdateColor(); }
+        if (Territorios.Contains(terr)) { Territorios.Remove(terr); if (terr != null) terr.UpdateColor(); }
     }
 
-    // Opcional: Request hand snapshot (owner pide su mano completa)
+    // Request hand snapshot (owner pide su mano al server)
     [ServerRpc(RequireOwnership = true)]
     public void RequestHandServerRpc(ServerRpcParams rpcParams = default)
     {
         if (!IsServer) return;
         var client = rpcParams.Receive.SenderClientId;
-        CardData[] arr = new CardData[Mano.mano.Count];
-        for (int i = 0; i < Mano.mano.Count; i++)
+        CardData[] arr = new CardData[Mano.hand.Count];
+        for (int i = 0; i < Mano.hand.Count; i++)
         {
-            arr[i].territoryIdx = (Mano.mano[i].territorio != null) ? Mano.mano[i].territorio.Idx : -1;
-            arr[i].tipo = (int)Mano.mano[i].tipo;
+            arr[i].territoryIdx = (Mano.hand[i].territorio != null) ? Mano.hand[i].territorio.Idx : -1;
+            arr[i].tipo = (int)Mano.hand[i].tipo;
         }
         var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { client } } };
         SendHandClientRpc(arr, clientRpcParams);
@@ -224,35 +225,45 @@ public class NetworkPlayer : NetworkBehaviour
         if (IsOwner && localManoUI != null) localManoUI.RecibirManoDesdeServer(hand);
         else
         {
-            var manoUI = FindFirstObjectByType<ManoJugadorUI>();
+            var manoUI = FindObjectOfType<ManoJugadorUI>();
             if (manoUI != null) manoUI.RecibirManoDesdeServer(hand);
             else Debug.LogWarning("SendHandClientRpc: no se encontró ManoJugadorUI en cliente.");
         }
     }
-    
+
     [ClientRpc]
     public void NotifyEliminatedClientRpc(ClientRpcParams clientRpcParams = default)
     {
         Debug.Log("[Client] NotifyEliminatedClientRpc recibido.");
-    
-        // Si soy el propietario (fui eliminado)
         if (IsOwner)
         {
-            // Mostrar UI local (si tienes UIManager con ShowEliminated)
             UIManager.Instance?.ShowEliminatedScreen();
-    
-            // Activar modo espectador local (si existe)
-            if (SpectatorManager.Instance != null)
-            {
-                SpectatorManager.Instance.EnterSpectatorModeLocal();
-            }
+            if (SpectatorManager.Instance != null) SpectatorManager.Instance.EnterSpectatorModeLocal();
         }
         else
         {
-            // Para otros clientes: solo actualizar estado de jugador visualmente
             UIManager.Instance?.RefrescarUI();
         }
     }
+
+    // --- NUEVO: Colocar tropas (client -> server wrapper)
+    // Llamar desde UI: ColocarTropasRequest(territoryIdx, cantidad)
+    public void ColocarTropasRequest(int territoryIdx, int cantidad)
+    {
+        if (!IsOwner) return;
+        ColocarTropasServerRpc(territoryIdx, cantidad);
+    }
+
+    [ServerRpc(RequireOwnership = true)]
+    public void ColocarTropasServerRpc(int territoryIdx, int cantidad, ServerRpcParams rpcParams = default)
+    {
+        if (!IsServer) return;
+        ulong sender = rpcParams.Receive.SenderClientId;
+        Territory t = BoardManager.Instance?.GetTerritoryByIdx(territoryIdx);
+        if (t == null) return;
+        if (t.TerritoryOwnerClientId.Value != sender) return;
+        if (TropasDisponibles.Value < cantidad) return;
+        t.AddSoldiersServer(cantidad);
+        TropasDisponibles.Value -= cantidad;
+    }
 }
-
-
