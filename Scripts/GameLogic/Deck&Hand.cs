@@ -104,7 +104,7 @@ public class ManoJugador
     //agrega cartas a la mano siempre y cuando haya espacio y la carta exista
     public void AgregarCartaMano(Carta cart)
     {
-        if (carta == null) { Debug.Log("La carta no existe (es null)"); return; }
+        if (cart == null) { Debug.Log("La carta no existe (es null)"); return; }
         if (mano.Count < mano.Capacity)
         {
             mano.Add(cart);
