@@ -1,4 +1,7 @@
 using UnityEngine;
+// Territory.cs
+// Componente de cada territorio: estado netcode, visual y neighbors.
+using UnityEngine;
 using Unity.Netcode;
 using System.Collections.Generic;
 
@@ -11,7 +14,7 @@ public class Territory : NetworkBehaviour
     [Header("State (Networked)")]
     public NetworkVariable<ulong> TerritoryOwnerClientId = new NetworkVariable<ulong>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
     public NetworkVariable<int> Soldiers = new NetworkVariable<int>(0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-    public NetworkVariable<Color> PlayerColorNet = new NetworkVariable<Color>(Color.gray, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+    public NetworkVariable<Color32> PlayerColorNet = new NetworkVariable<Color32>(new Color32(128, 128, 128, 255), NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     [Header("Visuals")]
     public Color NeutralColor = Color.gray;
@@ -39,15 +42,9 @@ public class Territory : NetworkBehaviour
         Soldiers.OnValueChanged += (_, __) => { /* efectos visuales si quieres */ };
     }
 
-    private void Start()
-    {
-        UpdateColor();
-    }
+    private void Start() { UpdateColor(); }
 
-    private void OnMouseDown()
-    {
-        BoardManager.Instance?.OnTerritoryClicked(this);
-    }
+    private void OnMouseDown() { BoardManager.Instance?.OnTerritoryClicked(this); }
 
     public void Highlight(bool state)
     {
@@ -73,18 +70,18 @@ public class Territory : NetworkBehaviour
     {
         if (rend == null) return;
         if (TerritoryOwnerClientId.Value == 0) PlayerColor = NeutralColor;
-        else PlayerColor = PlayerColorNet.Value;
+        else PlayerColor = (Color)PlayerColorNet.Value;
         rend.color = PlayerColor;
     }
 
-    private void UpdateColor(Color c)
+    private void UpdateColor(Color32 c)
     {
-        PlayerColor = c;
-        if (rend != null) rend.color = c;
+        PlayerColor = (Color)c;
+        if (rend != null) rend.color = PlayerColor;
     }
 
     // Métodos server-only
-    public void SetOwnerServer(ulong clientId, Color color)
+    public void SetOwnerServer(ulong clientId, Color32 color)
     {
         if (!IsServer) return;
         TerritoryOwnerClientId.Value = clientId;
