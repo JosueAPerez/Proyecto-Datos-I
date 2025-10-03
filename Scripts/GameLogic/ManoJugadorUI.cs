@@ -13,13 +13,16 @@ public class ManoJugadorUI : MonoBehaviour
     public Button btnCanjear;
     public Button btnCerrarMano;
     public Text txtMensaje;
-
+    
     public ManoJugador manoLogica = new ManoJugador();
     private MyArray<CartasUI> cartasVisuales;
     private bool manoAbierta = false;
     private NetworkPlayer ownerPlayer;
     private int maxSeleccion = 3;
     private int selectedCount = 0;
+
+    private bool forcedMode = false;
+    private float forcedModeTimer = 0f;
 
     public void Initialize(NetworkPlayer owner)
     {
@@ -185,7 +188,50 @@ public class ManoJugadorUI : MonoBehaviour
         MostrarMensaje($"Canje válido: +{tropas} tropas obtenidas.");
         RefrescarUI();
     }
+    
+    //Llamado por ForceExchangeClientRpc para entrar en modo forzado
+    public void StartForcedExchangeMode(int timeoutSeconds)
+    {
+        forcedMode = true;
+        forcedModeTimer = timeoutSeconds;
+        // Abrir mano si está cerrada
+        if (!manoAbierta) ToggleMano();
+        MostrarMensaje($"Debes canjear cartas (tienes 6). Tienes {timeoutSeconds}s para hacerlo.");
+        // Aquí puedes, por ejemplo, resaltar la instrucción y deshabilitar botones no relevantes
+    }
+
+    // En HandleCanjeResult, al recibir respuesta del servidor limpiamos el forcedMode
+    public void HandleCanjeResult(bool exito, int tropas, RemovedCardsInfo removed)
+    {
+        if (!exito) { MostrarMensaje("Canje inválido."); return; }
+        // ... tu lógica previa para remover cartas visualmente ...
+        MostrarMensaje($"Canje válido: +{tropas} tropas obtenidas.");
+        // Si venimos de forced mode y el canje fue exitoso, salir de forced mode
+        if (forcedMode && exito)
+        {
+            forcedMode = false;
+            forcedModeTimer = 0f;
+            // Opcional: cerrar la UI o dejar abierta según UX
+            ToggleMano(); // cierra la mano para volver al flujo normal
+        }
+        RefrescarUI();
+    }
+
+    private void Update()
+    {
+        // Countdown visual (opcional)
+        if (forcedMode && forcedModeTimer > 0f)
+        {
+            forcedModeTimer -= Time.deltaTime;
+            if (forcedModeTimer <= 0f)
+            {
+                forcedMode = false;
+                forcedModeTimer = 0f;
+            }
+        }
+    }
 }
+
 
 
 
