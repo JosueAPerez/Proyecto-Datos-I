@@ -99,18 +99,18 @@ public class Mazo
 //Maneja toda la logica de lo que puede hacer la mano del jugador
 public class ManoJugador
 {
-    public MyArray<Carta> mano { get; private set; } = new MyArray<Carta>(6); //la mano del jugador
+    public MyArray<Carta> hand { get; private set; } = new MyArray<Carta>(6); //la mano del jugador
 
     //agrega cartas a la mano siempre y cuando haya espacio y la carta exista
     public void AgregarCartaMano(Carta cart)
     {
         if (cart == null) { Debug.Log("La carta no existe (es null)"); return; }
-        if (mano.Count < mano.Capacity)
+        if (hand.Count < hand.Capacity)
         {
-            mano.Add(cart);
+            hand.Add(cart);
         }
 
-        else { Debug.Log("La mano esta llena"); return; }
+        else { Debug.Log("La hand esta llena"); return; }
     }
 
     /*
@@ -148,11 +148,11 @@ public class ManoJugador
             return 0;
         }
 
-        //quita todas las caras de la mano del jugador
+        //quita todas las caras de la hand del jugador
       
         for (int i = 0; i < selec.Count; i++)
         {
-            mano.Remove(selec[i]);
+            hand.Remove(selec[i]);
         }
 
         n_change++; //aumenta el n_change
@@ -162,7 +162,7 @@ public class ManoJugador
   
     public Carta ObtenerCartaiD(int id)
     {
-        foreach (var carta in mano)
+        foreach (var carta in hand)
         {
             if (carta != null && carta.id == id)
             {
