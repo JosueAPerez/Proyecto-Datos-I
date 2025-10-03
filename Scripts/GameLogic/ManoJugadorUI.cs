@@ -166,8 +166,8 @@ public class ManoJugadorUI : MonoBehaviour
             int ridx = removed.GetIdxAt(k);
             CardType rtipo = (CardType)removed.GetTipoAt(k);
             Carta encontrada = null;
-            foreach (var c in manoLogica.mano) if (c != null && ((c.territorio != null ? c.territorio.Idx : -1) == ridx) && c.tipo == rtipo) { encontrada = c; break; }
-            if (encontrada != null) manoLogica.mano.Remove(encontrada);
+            foreach (var c in manoLogica.hand) if (c != null && ((c.territorio != null ? c.territorio.Idx : -1) == ridx) && c.tipo == rtipo) { encontrada = c; break; }
+            if (encontrada != null) manoLogica.hand.Remove(encontrada);
 
             CartasUI visualARemover = null;
             for (int i = 0; i < cartasVisuales.Count; i++)
@@ -186,6 +186,7 @@ public class ManoJugadorUI : MonoBehaviour
         RefrescarUI();
     }
 }
+
 
 
 
