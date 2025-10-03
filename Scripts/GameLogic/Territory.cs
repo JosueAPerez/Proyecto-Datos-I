@@ -1,4 +1,3 @@
-using UnityEngine;
 // Territory.cs
 // Componente de cada territorio: estado netcode, visual y neighbors.
 using UnityEngine;
