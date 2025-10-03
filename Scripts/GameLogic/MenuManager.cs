@@ -14,7 +14,6 @@ public class MainMenuManager : MonoBehaviour
     public TMP_InputField inputIP;
     public Button botonHost;
     public Button botonClient;
-    public Button botonServer;
 
     [Header("Config")]
     [SerializeField] private string gameSceneName = "GameScene";
@@ -24,7 +23,6 @@ public class MainMenuManager : MonoBehaviour
     {
         botonHost.onClick.AddListener(OnHostClick);
         botonClient.onClick.AddListener(OnClientClick);
-        botonServer.onClick.AddListener(OnServerClick);
     }
 
     private string GetLocalIPAddress()
@@ -47,7 +45,6 @@ public class MainMenuManager : MonoBehaviour
     }
     public void OnHostClick()
     {
-        // 🔴 Save name before starting host
         GameSettings.NombreJugador = string.IsNullOrWhiteSpace(inputNombre.text) ? "JugadorPorDefecto" : inputNombre.text;
         string ip = GetLocalIPAddress();
         ConfigurarTransporte(ip);
@@ -59,21 +56,9 @@ public class MainMenuManager : MonoBehaviour
         }
     }
 
-    public void OnServerClick()
-    {
-        string ip = GetLocalIPAddress();
-        ConfigurarTransporte(ip);
-
-        if (NetworkManager.Singleton.StartServer())
-        {
-            Debug.Log($"Servidor iniciado en {ip}:{port}");
-            NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
-        }
-    }
-
     public void OnClientClick()
     {
-         GameSettings.NombreJugador = string.IsNullOrWhiteSpace(inputNombre.text) ? "JugadorPorDefecto" : inputNombre.text;
+        GameSettings.NombreJugador = string.IsNullOrWhiteSpace(inputNombre.text) ? "JugadorPorDefecto" : inputNombre.text;
         ConfigurarTransporte(inputIP.text);
 
         if (NetworkManager.Singleton.StartClient())
@@ -90,3 +75,4 @@ public class MainMenuManager : MonoBehaviour
     }
 
 }
+
