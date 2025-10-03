@@ -1,3 +1,4 @@
+// MainMenuManager.cs
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -20,9 +21,9 @@ public class MainMenuManager : MonoBehaviour
 
     void Start()
     {
-        botonHost.onClick.AddListener(OnHostClick);
-        botonClient.onClick.AddListener(OnClientClick);
-        botonServer.onClick.AddListener(OnServerClick);
+        if (botonHost != null) botonHost.onClick.AddListener(OnHostClick);
+        if (botonClient != null) botonClient.onClick.AddListener(OnClientClick);
+        if (botonServer != null) botonServer.onClick.AddListener(OnServerClick);
     }
 
     void GuardarNombre()
@@ -47,8 +48,8 @@ public class MainMenuManager : MonoBehaviour
     {
         GuardarNombre();
         ConfigurarTransporte("0.0.0.0");
-        DontDestroyOnLoad(NetworkManager.Singleton.gameObject);
-        if (NetworkManager.Singleton.StartHost())
+        if (NetworkManager.Singleton != null) DontDestroyOnLoad(NetworkManager.Singleton.gameObject);
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.StartHost())
         {
             Debug.Log("Host iniciado");
             NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
@@ -59,9 +60,9 @@ public class MainMenuManager : MonoBehaviour
     void OnClientClick()
     {
         GuardarNombre();
-        if (string.IsNullOrEmpty(inputIP.text)) { Debug.LogWarning("Ingresa la IP del servidor."); return; }
+        if (inputIP == null || string.IsNullOrEmpty(inputIP.text)) { Debug.LogWarning("Ingresa la IP del servidor."); return; }
         ConfigurarTransporte(inputIP.text);
-        if (NetworkManager.Singleton.StartClient()) Debug.Log("Cliente iniciado");
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.StartClient()) Debug.Log("Cliente iniciado");
         else Debug.LogError("No se pudo iniciar Cliente");
     }
 
@@ -69,7 +70,7 @@ public class MainMenuManager : MonoBehaviour
     {
         GuardarNombre();
         ConfigurarTransporte("0.0.0.0");
-        if (NetworkManager.Singleton.StartServer())
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.StartServer())
         {
             Debug.Log("Servidor iniciado");
             NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
