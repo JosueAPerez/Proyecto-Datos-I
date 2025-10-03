@@ -353,6 +353,20 @@ public class BoardManager : NetworkBehaviour
         currentPhase.Value = Phase.Reinforcement;
         LogAndSync($"🎯 Turno de {player.Alias.Value}, fase: {currentPhase.Value}");
         UIManager.Instance?.RefrescarUI();
+        int cartasEnMano = jugador.Mano.mano.Count;
+        if (cartasEnMano >= 6)
+        {
+            // Marcar flag en el NetworkPlayer para que clientes y servidor sepan que debe canjear
+            jugador.MustExchangeCards.Value = true;
+    
+            // Notificar al cliente propietario para que abra UI de canje forzado e indicar tiempo disponible
+            int timeoutSeconds = (int)NetworkPlayer.DefaultForcedExchangeTimeout; // usar el timeout deseado
+            var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { jugador.OwnerClientId } } };
+            jugador.ForceExchangeClientRpc(timeoutSeconds, clientRpcParams);
+    
+            // Iniciar coroutine servidor para esperar la respuesta y forzar auto-canje si expira
+            StartCoroutine(WaitForPlayerForcedExchangeCoroutine(jugador, timeoutSeconds));
+        }
     }
 
     [ServerRpc(RequireOwnership = false)]
@@ -899,4 +913,25 @@ public class BoardManager : NetworkBehaviour
         public bool conquered;
         public int tropasMovidas;
     }
+    private IEnumerator WaitForPlayerForcedExchangeCoroutine(NetworkPlayer jugador, int timeoutSeconds)
+    {
+        float start = Time.time;
+        // Esperar hasta que termine el timeout o el jugador haga el canje (flag limpiado)
+        while (Time.time - start < timeoutSeconds)
+        {
+            if (jugador == null) yield break;
+            if (!jugador.MustExchangeCards.Value) yield break; // el jugador ya canjeó
+            yield return null;
+        }
+    
+        // Timeout expirado: si el jugador sigue con el flag, forzamos el canje desde el player (server-side)
+        if (jugador != null && jugador.MustExchangeCards.Value)
+        {
+            Debug.Log($"[Server] Timeout canje forzado para jugador {jugador.OwnerClientId} al inicio de su fase de refuerzo.");
+            jugador.AutoForceCanjearServer();
+            jugador.MustExchangeCards.Value = false;
+        }
+    }
+
 }
+
