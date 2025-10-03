@@ -203,9 +203,6 @@ public class NetworkPlayer : NetworkBehaviour
             var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
             ShowObtainedCardClientRpc((nueva.territorio != null) ? nueva.territorio.Idx : -1, (int)nueva.tipo, clientRpcParams);
         }
-
-        var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
-        ShowObtainedCardClientRpc((nueva.territorio != null) ? nueva.territorio.Idx : -1, (int)nueva.tipo, clientRpcParams);
     }
 
     public bool ComprobarTerritorio(Territory terr) => Territorios.Contains(terr);
@@ -284,5 +281,6 @@ public class NetworkPlayer : NetworkBehaviour
         TropasDisponibles.Value -= cantidad;
     }
 }
+
 
 
