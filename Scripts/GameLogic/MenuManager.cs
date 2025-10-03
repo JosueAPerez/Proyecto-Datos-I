@@ -6,7 +6,7 @@ using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine.SceneManagement;
 
-public class MainMenuManager : MonoBehaviour
+public class MenuManager : MonoBehaviour
 {
     [Header("UI References")]
     public TMP_InputField inputNombre;
@@ -78,3 +78,4 @@ public class MainMenuManager : MonoBehaviour
         else Debug.LogError("No se pudo iniciar Servidor");
     }
 }
+
