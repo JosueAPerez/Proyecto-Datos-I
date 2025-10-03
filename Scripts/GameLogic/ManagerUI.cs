@@ -36,7 +36,6 @@ public class UIManager : MonoBehaviour
     public GameObject eliminatedPanel; // panel para cuando el jugador es eliminado
 
     private Territory selectedTerritorio;
-    private bool inventarioAbierto = false;
     private int pendingAttackIdForUI = -1;
     private int pendingAtacanteIdxForUI = -1;
     private int pendingDefensorIdxForUI = -1;
@@ -55,11 +54,8 @@ public class UIManager : MonoBehaviour
         if (terminarTurnoButton != null) terminarTurnoButton.onClick.AddListener(OnTerminarTurno);
         if (tropasSlider != null) tropasSlider.onValueChanged.AddListener(delegate { OnSliderChanged(); });
         if (cambiarFaseButton != null) cambiarFaseButton.onClick.AddListener(OnCambiarFase);
-        if (inventarioToggleButton != null) inventarioToggleButton.onClick.AddListener(ToggleInventario);
-        if (confirmarIntercambioButton != null) confirmarIntercambioButton.onClick.AddListener(OnConfirmarIntercambio);
 
         defensePromptPanel?.SetActive(false);
-        inventarioPanel?.SetActive(false);
 
         if (BoardManager.Instance != null)
         {
