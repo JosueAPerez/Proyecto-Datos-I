@@ -2,9 +2,9 @@ using UnityEngine;
 
 public enum CardType
 {
-    Infanteria = 0;
-    Caballeria = 1;
-    Infanteria = 2;
+    Infanteria = 0,
+    Caballeria = 1,
+    Infanteria = 2,
 }
 
 [System.Serializable]
@@ -43,4 +43,5 @@ public class Carta
         return id.GetHashCode() ^ ((int)tipo).GetHashCode();
     }
 }
+
 
