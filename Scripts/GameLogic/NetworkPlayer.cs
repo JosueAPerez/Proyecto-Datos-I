@@ -185,8 +185,27 @@ public class NetworkPlayer : NetworkBehaviour
     {
         if (!IsServer) return;
         if (Mano.hand.Count >= 7) { Debug.Log($"⚠️ {Alias.Value.ToString()} tiene 7 cartas."); return; }
-        var nueva = Carta.CrearAleatoriaDesdeTerritorio(terr);
-        Mano.AgregarCartaMano(nueva);
+        // Server-side: tomar carta del mazo global si existe
+        if (BoardManager.Instance != null && BoardManager.Instance.deck != null)
+        {
+            Carta nueva = BoardManager.Instance.deck.RobarCarta();
+            // Si el mazo está vacío, fallback a crear una carta aleatoria ligada al territorio
+            if (nueva == null) nueva = new Carta((CardType)UnityEngine.Random.Range(0, 3), terr);
+            Mano.AgregarCartaMano(nueva);
+        
+            // Notificar al owner del jugador
+            var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
+            ShowObtainedCardClientRpc((nueva.territorio != null) ? nueva.territorio.Idx : -1, (int)nueva.tipo, clientRpcParams);
+        }
+        else
+        {
+            // Si no hay mazo, crear una carta ligada al territorio (comportamiento previo)
+            var nueva = new Carta((CardType)UnityEngine.Random.Range(0, 3), terr);
+            Mano.AgregarCartaMano(nueva);
+            var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
+            ShowObtainedCardClientRpc((nueva.territorio != null) ? nueva.territorio.Idx : -1, (int)nueva.tipo, clientRpcParams);
+        }
+
         var clientRpcParams = new ClientRpcParams { Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { this.OwnerClientId } } };
         ShowObtainedCardClientRpc((nueva.territorio != null) ? nueva.territorio.Idx : -1, (int)nueva.tipo, clientRpcParams);
     }
@@ -267,3 +286,4 @@ public class NetworkPlayer : NetworkBehaviour
         TropasDisponibles.Value -= cantidad;
     }
 }
+
