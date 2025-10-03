@@ -33,19 +33,11 @@ public class UIManager : MonoBehaviour
     public Button inventarioToggleButton;
     public Button confirmarIntercambioButton;
 
-    [Header("Sprites de cartas")]
-    public Sprite spriteInfanteria;
-    public Sprite spriteCaballeria;
-    public Sprite spriteArtilleria;
-
     [Header("Defense Prompt UI")]
     public GameObject defensePromptPanel;
     public Slider defensaSlider;
     public TextMeshProUGUI defensaSliderValueText;
     public TextMeshProUGUI defensaPromptTitle;
-
-    [Header("Card UI Prefab")]
-    public GameObject cartaUIPrefab;
 
     [Header("Panels adicionales")]
     public GameObject eliminatedPanel; // panel para cuando el jugador es eliminado
@@ -225,37 +217,6 @@ public class UIManager : MonoBehaviour
         if (inventarioAbierto) ActualizarInventario(BoardManager.Instance.GetJugadorLocal());
     }
 
-    public void ActualizarInventario(NetworkPlayer jugador)
-    {
-        if (jugador == null || contenedorCartas == null || cartaPrefab == null) return;
-        foreach (Transform child in contenedorCartas) GameObject.Destroy(child.gameObject);
-
-        for (int i = 0; i < jugador.Mano.hand.Count; i++)
-        {
-            Carta carta = jugador.Mano.hand[i];
-            GameObject nueva = Instantiate(cartaPrefab, contenedorCartas);
-            Image img = nueva.GetComponentInChildren<Image>();
-            if (img != null)
-            {
-                switch (carta.tipo)
-                {
-                    case CardType.Infanteria: img.sprite = spriteInfanteria; break;
-                    case CardType.Caballeria: img.sprite = spriteCaballeria; break;
-                    default: img.sprite = spriteArtilleria; break;
-                }
-            }
-            TextMeshProUGUI label = nueva.GetComponentInChildren<TextMeshProUGUI>();
-            if (label != null) label.text = carta.territorio != null ? $"ID {carta.territorio.Idx}" : "";
-        }
-    }
-
-    private void OnConfirmarIntercambio()
-    {
-        var jugador = BoardManager.Instance.GetJugadorLocal();
-        if (jugador == null) return;
-        Debug.Log("OnConfirmarIntercambio: si usas ManoJugadorUI, el canje se realiza desde ahí.");
-    }
-    #endregion
 
     #region Attack result handling
     public void HandleAttackResult(BoardManager.AttackResultSummary summary)
