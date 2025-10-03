@@ -24,7 +24,7 @@ public class BoardManager : NetworkBehaviour
     public NetworkVariable<Phase> currentPhase = new NetworkVariable<Phase>(Phase.Reinforcement);
 
     // Lista de jugadores conectados (referencias a NetworkObject) — se inicializa en OnNetworkSpawn
-    private NetworkList<NetworkObjectReference> connectedPlayers;
+    public NetworkList<NetworkObjectReference> connectedPlayers = new NetworkList<NetworkObjectReference>();
 
     // Acceso rápido por id
     public Dictionary<int, Territory> territoryById = new Dictionary<int, Territory>();
@@ -85,7 +85,7 @@ public class BoardManager : NetworkBehaviour
             Destroy(gameObject);
             return;
         }
-
+    
         // Obtener territorios en escena y crear mapa id -> territory
         territories = FindObjectsByType<Territory>(FindObjectsSortMode.None);
         Array.Sort(territories, (a, b) => a.Idx.CompareTo(b.Idx));
@@ -127,8 +127,6 @@ public class BoardManager : NetworkBehaviour
     public override void OnNetworkSpawn()
     {
         base.OnNetworkSpawn();
-        if (IsServer && connectedPlayers == null)
-            connectedPlayers = new NetworkList<NetworkObjectReference>();
     }
 
     private void OnSceneLoaded(string sceneName, LoadSceneMode mode, List<ulong> clientsCompleted, List<ulong> clientsTimedOut)
@@ -346,12 +344,12 @@ public class BoardManager : NetworkBehaviour
         if (!IsServer) return;
         if (connectedPlayers == null || connectedPlayers.Count == 0) return;
 
-        var player = GetJugadorFromReference(connectedPlayers[currentPlayerIndex.Value]);
-        if (player == null) return;
+        var jugador = GetJugadorFromReference(connectedPlayers[currentPlayerIndex.Value]);
+        if (jugador == null) return;
 
-        player.AsignarRefuerzos();
+        jugador.AsignarRefuerzos();
         currentPhase.Value = Phase.Reinforcement;
-        LogAndSync($"🎯 Turno de {player.Alias.Value}, fase: {currentPhase.Value}");
+        LogAndSync($"🎯 Turno de {jugador.Alias.Value}, fase: {currentPhase.Value}");
         UIManager.Instance?.RefrescarUI();
         int cartasEnMano = jugador.Mano.mano.Count;
         if (cartasEnMano >= 6)
@@ -383,6 +381,15 @@ public class BoardManager : NetworkBehaviour
     public void TerminarTurnoServerRpc(ServerRpcParams rpcParams = default)
     {
         if (!IsServer) return;
+
+        var sender = rpcParams.Receive.SenderClientId;
+        var current = GetJugadorActual();
+        if (current == null || current.OwnerClientId != sender)
+        {
+            LogAndSync($"❌ TerminarTurno: client {sender} no es jugador actual.");
+            return;
+        }
+        
         if (connectedPlayers == null || connectedPlayers.Count == 0) return;
         currentPlayerIndex.Value = (currentPlayerIndex.Value + 1) % connectedPlayers.Count;
         IniciarTurno();
@@ -934,4 +941,5 @@ public class BoardManager : NetworkBehaviour
     }
 
 }
+
 
