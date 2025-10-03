@@ -1,4 +1,3 @@
-// MainMenuManager.cs
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -8,7 +7,7 @@ using UnityEngine.SceneManagement;
 using System.Net;
 using System.Net.Sockets;
 
-public class MenuManager : MonoBehaviour
+public class MainMenuManager : MonoBehaviour
 {
     [Header("UI References")]
     public TMP_InputField inputNombre;
@@ -18,67 +17,76 @@ public class MenuManager : MonoBehaviour
     public Button botonServer;
 
     [Header("Config")]
-    public string gameSceneName = "GameScene";
-    public ushort port = 7777;
+    [SerializeField] private string gameSceneName = "GameScene";
+    [SerializeField] private int port = 7777;
 
     void Start()
     {
-        if (botonHost != null) botonHost.onClick.AddListener(OnHostClick);
-        if (botonClient != null) botonClient.onClick.AddListener(OnClientClick);
-        if (botonServer != null) botonServer.onClick.AddListener(OnServerClick);
+        botonHost.onClick.AddListener(OnHostClick);
+        botonClient.onClick.AddListener(OnClientClick);
+        botonServer.onClick.AddListener(OnServerClick);
     }
 
-    void GuardarNombre()
+    private string GetLocalIPAddress()
     {
-        string nombre = inputNombre != null ? inputNombre.text.Trim() : "";
-        if (!string.IsNullOrEmpty(nombre)) GameSettings.NombreJugador = nombre;
-    }
-
-    void ConfigurarTransporte(string ip)
-    {
-        if (NetworkManager.Singleton == null) { Debug.LogError("NetworkManager.Singleton es null"); return; }
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        if (transport != null)
+        string localIP = "127.0.0.1"; // fallback
+        try
         {
-            transport.ConnectionData.Address = ip;
-            transport.ConnectionData.Port = port;
+            using (Socket socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, 0))
+            {
+                socket.Connect("8.8.8.8", 65530);
+                IPEndPoint endPoint = socket.LocalEndPoint as IPEndPoint;
+                localIP = endPoint.Address.ToString();
+            }
         }
-        else Debug.LogWarning("UnityTransport no encontrado en NetworkManager.Singleton");
-    }
-
-    void OnHostClick()
-    {
-        GuardarNombre();
-        ConfigurarTransporte("0.0.0.0");
-        if (NetworkManager.Singleton != null) DontDestroyOnLoad(NetworkManager.Singleton.gameObject);
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.StartHost())
+        catch
         {
-            Debug.Log("Host iniciado");
+            Debug.LogWarning("No se pudo detectar la IP local, usando 127.0.0.1");
+        }
+        return localIP;
+    }
+    public void OnHostClick()
+    {
+        // 🔴 Save name before starting host
+        GameSettings.NombreJugador = string.IsNullOrWhiteSpace(inputNombre.text) ? "JugadorPorDefecto" : inputNombre.text;
+        string ip = GetLocalIPAddress();
+        ConfigurarTransporte(ip);
+        DontDestroyOnLoad(NetworkManager.Singleton.gameObject);
+        if (NetworkManager.Singleton.StartHost())
+        {
+            Debug.Log($"Host iniciado en {ip}:{port}");
             NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
         }
-        else Debug.LogError("No se pudo iniciar Host");
     }
 
-    void OnClientClick()
+    public void OnServerClick()
     {
-        GuardarNombre();
-        if (inputIP == null || string.IsNullOrEmpty(inputIP.text)) { Debug.LogWarning("Ingresa la IP del servidor."); return; }
+        string ip = GetLocalIPAddress();
+        ConfigurarTransporte(ip);
+
+        if (NetworkManager.Singleton.StartServer())
+        {
+            Debug.Log($"Servidor iniciado en {ip}:{port}");
+            NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+        }
+    }
+
+    public void OnClientClick()
+    {
+         GameSettings.NombreJugador = string.IsNullOrWhiteSpace(inputNombre.text) ? "JugadorPorDefecto" : inputNombre.text;
         ConfigurarTransporte(inputIP.text);
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.StartClient()) Debug.Log("Cliente iniciado");
-        else Debug.LogError("No se pudo iniciar Cliente");
-    }
 
-    void OnServerClick()
-    {
-        GuardarNombre();
-        ConfigurarTransporte("0.0.0.0");
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.StartServer())
+        if (NetworkManager.Singleton.StartClient())
         {
-            Debug.Log("Servidor iniciado");
-            NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+            Debug.Log($"Cliente intentando conectar a {inputIP.text}:{port}");
         }
-        else Debug.LogError("No se pudo iniciar Servidor");
     }
+
+    private void ConfigurarTransporte(string ipAddress)
+    {
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        transport.ConnectionData.Address = ipAddress;
+        transport.ConnectionData.Port = (ushort)port;
+    }
+
 }
-
-
