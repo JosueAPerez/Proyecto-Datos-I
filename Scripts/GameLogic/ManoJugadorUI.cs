@@ -84,9 +84,9 @@ public class ManoJugadorUI : MonoBehaviour
         cartasVisuales = new MyArray<CartasUI>(6);
         selectedCount = 0;
 
-        for (int i = 0; i < manoLogica.mano.Count; i++)
+        for (int i = 0; i < manoLogica.hand.Count; i++)
         {
-            Carta logica = manoLogica.mano[i];
+            Carta logica = manoLogica.hand[i];
             GameObject go = Instantiate(cartaUIPrefab, contenedorCartas);
             CartasUI cui = go.GetComponent<CartasUI>();
             Sprite s = SpriteManager.GetSpriteForCarta(logica);
@@ -186,5 +186,6 @@ public class ManoJugadorUI : MonoBehaviour
         RefrescarUI();
     }
 }
+
 
 
