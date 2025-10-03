@@ -173,11 +173,40 @@ public class NetworkPlayer : NetworkBehaviour
     public void AsignarRefuerzos()
     {
         if (!IsServer) return;
-        int tropasBase = Mathf.Max(3, Territorios.Count / 3);
+        int tropasBase = BonusContienente(Territorios) + (Territorios.Count / 3);
         TropasDisponibles.Value += tropasBase;
         Debug.Log($"(Server) {Alias.Value.ToString()} recibe {tropasBase} tropas.");
     }
+    
+    public int BonusContinente(MyArray<Territory> terrs)
+    {
+        int cont = 0;
+        
+        int[] Asia = {0, 1, 2, 3, 4, 5, 6}
+        int[] AmericaNorte = {7, 8, 9, 10, 11, 12, 13}
+        int[] Europa = {14, 15, 16, 17, 18, 19, 20}
+        int[] África = {21, 22, 23, 24, 25, 26, 27}
+        int[] AmericaSur = {28, 29, 30, 31, 32, 33, 34}
+        int[] Oceania = {35, 36, 37, 38, 39, 40, 41}
 
+        if (EstaEnArray(Asia, terrs)) cont += 7;
+        if (EstaEnArray(AmericaNorte, terrs)) cont += 3;
+        if (EstaEnArray(Europa, terrs)) cont += 5;
+        if (EstaEnArray(África, terrs)) cont += 3;
+        if (EstaEnArray(AmericaSur, terrs)) cont += 2;
+        if (EstaEnArray(Oceania, terrs)) cont += 2;
+
+        return cont;
+    }
+        
+    public bool EstaEnArray(int[] Cont, MyArray<Territory> terrs)
+    {
+        for (int i = 0; i < Cont.Length; i++)
+        {
+            if (Cont[i] != terrs[i].Idx) return false;
+        }
+        return true;
+    }
     // Recompensa por conquista
     public void RecompensaConquista(Territory terr)
     {
@@ -281,6 +310,7 @@ public class NetworkPlayer : NetworkBehaviour
         TropasDisponibles.Value -= cantidad;
     }
 }
+
 
 
 
