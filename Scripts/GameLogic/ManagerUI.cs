@@ -1,3 +1,5 @@
+// UIManager.cs
+// Controla la UI general: información del jugador, slider, inventario, prompt defensor, etc.
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -11,7 +13,7 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI PlayerName;
     public TextMeshProUGUI tropasDisponiblesText;
     public Button cambiarFaseButton;
-    public TextMeshProUGUI FaseActual;
+    public TextMeshProUGUI faseActualText;
     public TextMeshProUGUI tropasEnTerritorioText;
     public TextMeshProUGUI sliderValueText;
     public Slider tropasSlider;
@@ -43,9 +45,12 @@ public class UIManager : MonoBehaviour
     public TextMeshProUGUI defensaPromptTitle;
 
     [Header("Card UI Prefab")]
-    public GameObject cartaUIPrefab; // para ManoJugadorUI prefabs si no están asignados en players
+    public GameObject cartaUIPrefab;
 
-    private Territory territorioSeleccionado;
+    [Header("Panels adicionales")]
+    public GameObject eliminatedPanel; // panel para cuando el jugador es eliminado
+
+    private Territory selectedTerritorio;
     private bool inventarioAbierto = false;
     private int pendingAttackIdForUI = -1;
     private int pendingAtacanteIdxForUI = -1;
@@ -61,7 +66,6 @@ public class UIManager : MonoBehaviour
     private void Start()
     {
         RefrescarUI();
-
         if (colocarButton != null) colocarButton.onClick.AddListener(OnColocarTropas);
         if (terminarTurnoButton != null) terminarTurnoButton.onClick.AddListener(OnTerminarTurno);
         if (tropasSlider != null) tropasSlider.onValueChanged.AddListener(delegate { OnSliderChanged(); });
@@ -74,43 +78,51 @@ public class UIManager : MonoBehaviour
 
         if (BoardManager.Instance != null)
         {
-            BoardManager.Instance.JugadorActualIdx.OnValueChanged += (_, __) => RefrescarUI();
-            BoardManager.Instance.FaseActual.OnValueChanged += (_, __) => { ActualizarBackground(); RefrescarUI(); };
+            BoardManager.Instance.currentPlayerIndex.OnValueChanged += (_, __) => RefrescarUI();
+            BoardManager.Instance.currentPhase.OnValueChanged += (_, __) => { ActualizarBackground(); RefrescarUI(); };
         }
     }
 
     public void SeleccionarTerritorio(Territory terr)
     {
-        territorioSeleccionado = terr;
+        selectedTerritorio = terr;
         RefrescarUI();
     }
 
+    // Actualizar datos visibles en UI (protegiendo nulls)
     public void RefrescarUI()
     {
         var jugador = BoardManager.Instance?.GetJugadorLocal();
         if (jugador == null) return;
 
-        PlayerName.text = jugador.Alias.Value.ToString();
-        tropasDisponiblesText.text = $"Tropas disponibles: {jugador.TropasDisponibles.Value}";
-        FaseActual.text = $"Fase actual: {BoardManager.Instance.FaseActual.Value}";
+        if (PlayerName != null) PlayerName.text = jugador.Alias.Value.ToString();
+        if (tropasDisponiblesText != null) tropasDisponiblesText.text = $"Tropas disponibles: {jugador.TropasDisponibles.Value}";
+        if (faseActualText != null) faseActualText.text = $"Fase actual: {BoardManager.Instance.currentPhase.Value}";
 
-        if (territorioSeleccionado != null && jugador.ComprobarTerritorio(territorioSeleccionado))
+        // Si hay un territorio seleccionado y es del jugador, actualizar slider según fase
+        if (selectedTerritorio != null && jugador.ComprobarTerritorio(selectedTerritorio))
         {
-            tropasEnTerritorioText.text = $"Tropas en territorio: {territorioSeleccionado.Soldiers.Value}";
+            if (tropasEnTerritorioText != null) tropasEnTerritorioText.text = $"Tropas en territorio: {selectedTerritorio.Soldiers.Value}";
 
-            switch (BoardManager.Instance.FaseActual.Value)
+            if (tropasSlider == null)
             {
-                case BoardManager.TurnPhase.Refuerzo:
+                Debug.LogWarning("RefrescarUI: tropasSlider no asignado.");
+                return;
+            }
+
+            switch (BoardManager.Instance.currentPhase.Value)
+            {
+                case BoardManager.Phase.Reinforcement:
                     tropasSlider.minValue = 1;
                     tropasSlider.maxValue = Mathf.Max(1, jugador.TropasDisponibles.Value);
                     break;
-                case BoardManager.TurnPhase.Ataque:
-                    int maxT = Mathf.Max(0, territorioSeleccionado.Soldiers.Value - 1);
+                case BoardManager.Phase.Attack:
+                    int maxT = Mathf.Max(0, selectedTerritorio.Soldiers.Value - 1);
                     tropasSlider.minValue = maxT > 0 ? 1 : 0;
-                    tropasSlider.maxValue = Mathf.Min(3, maxT); // atacante max 3
+                    tropasSlider.maxValue = Mathf.Min(3, maxT);
                     break;
-                case BoardManager.TurnPhase.Reagrupacion:
-                    int maxT2 = Mathf.Max(0, territorioSeleccionado.Soldiers.Value - 1);
+                case BoardManager.Phase.Regroup:
+                    int maxT2 = Mathf.Max(0, selectedTerritorio.Soldiers.Value - 1);
                     tropasSlider.minValue = maxT2 > 0 ? 1 : 0;
                     tropasSlider.maxValue = maxT2;
                     break;
@@ -118,24 +130,23 @@ public class UIManager : MonoBehaviour
 
             if (tropasSlider.maxValue < tropasSlider.minValue) tropasSlider.value = 0;
             else tropasSlider.value = tropasSlider.minValue;
-
             OnSliderChanged();
         }
         else
         {
-            tropasEnTerritorioText.text = "Tropas en territorio: -";
-            sliderValueText.text = "";
+            if (tropasEnTerritorioText != null) tropasEnTerritorioText.text = "Tropas en territorio: -";
+            if (sliderValueText != null) sliderValueText.text = "";
         }
     }
 
     public void ActualizarBackground()
     {
-        if (BoardManager.Instance == null) return;
-        switch (BoardManager.Instance.FaseActual.Value)
+        if (BoardManager.Instance == null || mainCamera == null) return;
+        switch (BoardManager.Instance.currentPhase.Value)
         {
-            case BoardManager.TurnPhase.Refuerzo: mainCamera.backgroundColor = colorRefuerzo; break;
-            case BoardManager.TurnPhase.Ataque: mainCamera.backgroundColor = colorAtaque; break;
-            case BoardManager.TurnPhase.Reagrupacion: mainCamera.backgroundColor = colorReagrupacion; break;
+            case BoardManager.Phase.Reinforcement: mainCamera.backgroundColor = colorRefuerzo; break;
+            case BoardManager.Phase.Attack: mainCamera.backgroundColor = colorAtaque; break;
+            case BoardManager.Phase.Regroup: mainCamera.backgroundColor = colorReagrupacion; break;
         }
     }
 
@@ -154,21 +165,23 @@ public class UIManager : MonoBehaviour
     private void OnColocarTropas()
     {
         var jugador = BoardManager.Instance.GetJugadorLocal();
-        if (jugador == null || territorioSeleccionado == null) return;
-        int cantidad = (int)tropasSlider.value;
-        if (jugador.ColocarTropas(territorioSeleccionado, cantidad)) RefrescarUI();
+        if (jugador == null || selectedTerritorio == null) return;
+        int cantidad = tropasSlider != null ? (int)tropasSlider.value : 1;
+
+        // Llamar al servidor a través de NetworkPlayer
+        jugador.ColocarTropasRequest(selectedTerritorio.Idx, cantidad);
     }
 
     private void OnTerminarTurno()
     {
         if (BoardManager.Instance != null) BoardManager.Instance.TerminarTurnoServerRpc();
-        territorioSeleccionado = null;
-        tropasEnTerritorioText.text = "Tropas en territorio: -";
-        sliderValueText.text = "";
+        selectedTerritorio = null;
+        if (tropasEnTerritorioText != null) tropasEnTerritorioText.text = "Tropas en territorio: -";
+        if (sliderValueText != null) sliderValueText.text = "";
         RefrescarUI();
     }
 
-    #region Defense prompt (defensor selecciona 1..2)
+    #region Defense prompt
     public void ShowDefensePrompt(int attackId, int atacanteIdx, int defensorIdx, int tropasAtq, int maxDefPossible)
     {
         if (defensePromptPanel == null || defensaSlider == null || defensaSliderValueText == null || defensaPromptTitle == null)
@@ -208,25 +221,28 @@ public class UIManager : MonoBehaviour
     private void ToggleInventario()
     {
         inventarioAbierto = !inventarioAbierto;
-        inventarioPanel.SetActive(inventarioAbierto);
+        if (inventarioPanel != null) inventarioPanel.SetActive(inventarioAbierto);
         if (inventarioAbierto) ActualizarInventario(BoardManager.Instance.GetJugadorLocal());
     }
 
     public void ActualizarInventario(NetworkPlayer jugador)
     {
-        if (jugador == null) return;
+        if (jugador == null || contenedorCartas == null || cartaPrefab == null) return;
         foreach (Transform child in contenedorCartas) GameObject.Destroy(child.gameObject);
 
-        for (int i = 0; i < jugador.Mano.mano.Count; i++)
+        for (int i = 0; i < jugador.Mano.hand.Count; i++)
         {
-            Carta carta = jugador.Mano.mano[i];
+            Carta carta = jugador.Mano.hand[i];
             GameObject nueva = Instantiate(cartaPrefab, contenedorCartas);
-            Image img = nueva.GetComponent<Image>();
-            switch (carta.tipo)
+            Image img = nueva.GetComponentInChildren<Image>();
+            if (img != null)
             {
-                case CardType.Infanteria: img.sprite = spriteInfanteria; break;
-                case CardType.Caballeria: img.sprite = spriteCaballeria; break;
-                default: img.sprite = spriteArtilleria; break;
+                switch (carta.tipo)
+                {
+                    case CardType.Infanteria: img.sprite = spriteInfanteria; break;
+                    case CardType.Caballeria: img.sprite = spriteCaballeria; break;
+                    default: img.sprite = spriteArtilleria; break;
+                }
             }
             TextMeshProUGUI label = nueva.GetComponentInChildren<TextMeshProUGUI>();
             if (label != null) label.text = carta.territorio != null ? $"ID {carta.territorio.Idx}" : "";
@@ -237,14 +253,14 @@ public class UIManager : MonoBehaviour
     {
         var jugador = BoardManager.Instance.GetJugadorLocal();
         if (jugador == null) return;
-        // UI de selección de 3 cartas no implementada aquí; se delega a ManoJugadorUI en el prefab del player
         Debug.Log("OnConfirmarIntercambio: si usas ManoJugadorUI, el canje se realiza desde ahí.");
     }
     #endregion
 
-    #region Attack result handling (recibido desde BoardManager)
+    #region Attack result handling
     public void HandleAttackResult(BoardManager.AttackResultSummary summary)
     {
+        if (summary == null) return;
         string s = $"Ataque {summary.attackId}: {summary.atacanteIdx} vs {summary.defensorIdx}\n" +
                    $"Dados Atq: {string.Join(",", summary.attRolls ?? new int[0])}  Dados Def: {string.Join(",", summary.defRolls ?? new int[0])}\n" +
                    $"Pérdidas Atq: {summary.attackerLosses}  Pérdidas Def: {summary.defenderLosses}\n" +
@@ -253,4 +269,18 @@ public class UIManager : MonoBehaviour
         RefrescarUI();
     }
     #endregion
+
+    // Mostrar pantalla local de eliminación
+    public void ShowEliminatedScreen()
+    {
+        if (eliminatedPanel != null) eliminatedPanel.SetActive(true);
+        else Debug.Log("[UIManager] ShowEliminatedScreen llamado (sin panel asignado).");
+    }
+
+    // Mostrar fin de juego
+    public void ShowEndGame(ulong winnerClientId, string winnerName)
+    {
+        Debug.Log($"[UI] EndGame: ganador={winnerName} ({winnerClientId})");
+        // Aquí puedes mostrar un panel, etc.
+    }
 }
