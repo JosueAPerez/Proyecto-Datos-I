@@ -54,7 +54,7 @@ public class ManoJugadorUI : MonoBehaviour
         Territory terr = null;
         if (BoardManager.Instance != null)
         {
-            foreach (var t in BoardManager.Instance.Territories) if (t != null && t.Idx == territoryIdx) { terr = t; break; }
+            foreach (var t in BoardManager.Instance.territories) if (t != null && t.Idx == territoryIdx) { terr = t; break; }
         }
         Carta nueva = new Carta(tipo, terr);
         manoLogica.AgregarCartaMano(nueva);
@@ -186,3 +186,4 @@ public class ManoJugadorUI : MonoBehaviour
         RefrescarUI();
     }
 }
+
