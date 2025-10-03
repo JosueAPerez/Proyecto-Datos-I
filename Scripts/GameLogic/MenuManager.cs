@@ -5,6 +5,8 @@ using TMPro;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using UnityEngine.SceneManagement;
+using System.Net;
+using System.Net.Sockets;
 
 public class MenuManager : MonoBehaviour
 {
@@ -78,4 +80,5 @@ public class MenuManager : MonoBehaviour
         else Debug.LogError("No se pudo iniciar Servidor");
     }
 }
+
 
