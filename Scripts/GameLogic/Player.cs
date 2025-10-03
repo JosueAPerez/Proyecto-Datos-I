@@ -297,12 +297,12 @@ public class NetworkPlayer : NetworkBehaviour
     {
         int cont = 0;
         
-        int[] Asia = {0, 1, 2, 3, 4, 5, 6}
-        int[] AmericaNorte = {7, 8, 9, 10, 11, 12, 13}
-        int[] Europa = {14, 15, 16, 17, 18, 19, 20}
-        int[] África = {21, 22, 23, 24, 25, 26, 27}
-        int[] AmericaSur = {28, 29, 30, 31, 32, 33, 34}
-        int[] Oceania = {35, 36, 37, 38, 39, 40, 41}
+        int[] Asia = {0, 1, 2, 3, 4, 5, 6};
+        int[] AmericaNorte = {7, 8, 9, 10, 11, 12, 13};
+        int[] Europa = {14, 15, 16, 17, 18, 19, 20};
+        int[] Africa = {21, 22, 23, 24, 25, 26, 27};
+        int[] AmericaSur = {28, 29, 30, 31, 32, 33, 34};
+        int[] Oceania = {35, 36, 37, 38, 39, 40, 41};
 
         if (EstaEnArray(Asia, terrs)) cont += 7;
         if (EstaEnArray(AmericaNorte, terrs)) cont += 3;
@@ -425,6 +425,7 @@ public class NetworkPlayer : NetworkBehaviour
         TropasDisponibles.Value -= cantidad;
     }
 }
+
 
 
 
